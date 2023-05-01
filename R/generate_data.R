@@ -1,5 +1,5 @@
 # Purpose: Data generation for allelic series.
-# Updated: 2022-08-02
+# Updated: 2023-03-15
 
 
 #' Generate Genotype Matrix
@@ -37,20 +37,18 @@ GenGenoMat <- function(
 #' matrix. Each SNP is classified as a benign missense variant (0), a
 #' deleterious missense variant (1), or a protein truncating variant (2).
 #'
-#' @param mat Genotype matrix.
+#' @param snps Number of SNPs in the gene.
 #' @param p_dmv Frequency of deleterious missense variants.
 #' @param p_ptv Frequency of protein truncating variants.
 #' @return (snps x 1) integer vector.
 GenAnno <- function(
-  mat,
+  snps,
   p_dmv = 0.33,
   p_ptv = 0.33
 ) {
   p_bmv <- 1 - sum(c(p_dmv, p_ptv))
   p <- c(p_bmv, p_dmv, p_ptv)
-  n_snps <- ncol(mat)
-
-  anno <- stats::rmultinom(n_snps, size = 1, prob = p)
+  anno <- stats::rmultinom(snps, size = 1, prob = p)
   anno <- apply(anno, 2, which.max) - 1
   return(anno)
 }
@@ -73,10 +71,44 @@ GenGeno <- function(
   p_ptv = 0.33
 ) {
   geno <- GenGenoMat(n = n, snps = snps, maf_range = maf_range)
-  anno <- GenAnno(geno, p_dmv, p_ptv)
+  anno <- GenAnno(snps, p_dmv, p_ptv)
   out <- list(
-    geno = geno,
-    anno = anno
+    anno = anno,
+    geno = geno
+  )
+  return(out)
+}
+
+
+#' Filter Noncausal Variants
+#' 
+#' Remove a random fraction of variants, which are designated non-causal. 
+#' 
+#' @param anno (snps x 1) annotation vector.
+#' @param geno (n x snps) genotype matrix.
+#' @param prop_causal Proportion of variants which are causal.
+#' @return List containing the (n x snps) genotype matrix "geno" and the
+#' (snps x 1) annotation vector "anno".
+FilterGenos <- function(
+  anno,
+  geno,
+  prop_causal = 1.0
+) {
+  
+  n_snp <- length(anno)
+  p_noncausal <- 1.0 - prop_causal
+  n_noncausal <- round(n_snp * p_noncausal)
+  which_drop <- sample(x = n_snp, size = n_noncausal, replace = FALSE)
+  
+  # Code non-causal variants as "-1". 
+  anno[which_drop] <- -1
+  geno_filtered <- geno[, anno != -1, drop = FALSE]
+  anno_filtered <- anno[anno != -1]
+  
+  # Output.
+  out <- list(
+    anno = anno_filtered,
+    geno = geno_filtered
   )
   return(out)
 }
@@ -100,14 +132,15 @@ GenCovar <- function(n) {
   sex <- stats::rbinom(n, size = 1, prob = 0.5)
 
   # 3 covariates representing PCs.
-  pcs <- lapply(seq_len(3), function(i) {stats::rnorm(n)})
+  N_PC <- 3
+  pcs <- lapply(seq_len(N_PC), function(i) {stats::rnorm(n)})
   pcs <- do.call(cbind, pcs)
 
   # Output.
-  out <- cbind(age, sex, pcs)
+  out <- cbind(age, pcs)
   out <- scale(out)
-  out <- cbind(1, out)
-  colnames(out) <- c("int", "age", "sex", "pc1", "pc2", "pc3")
+  out <- cbind(1, out[, 1], sex, out[, 2:ncol(out)])
+  colnames(out) <- c("int", "age", "sex", paste0("pc", seq_len(N_PC)))
   return(out)
 }
 
@@ -162,8 +195,10 @@ CalcRegParam <- function(
 #'   value. Intended for testing.
 #' @param indicator Convert raw counts to indicators? Default: FALSE.
 #' @param method Genotype aggregation method. Default: "none".
+#' @param prop_causal Proportion of variants which are causal.
 #' @param random_signs Randomize signs? FALSE for burden-type genetic
 #'   architecture, TRUE for SKAT-type.
+#' @param random_var Frailty variance in the case of random signs. Default: 0.
 #' @param weights Aggregation weights.
 #' @return (n x 1) numeric vector.
 GenPheno <- function(
@@ -176,7 +211,9 @@ GenPheno <- function(
   include_residual = TRUE,
   indicator = FALSE,
   method = "none",
+  prop_causal = 1.0,
   random_signs = FALSE,
+  random_var = 0.0, 
   weights = c(0, 1, 2)
 ) {
 
@@ -187,6 +224,15 @@ GenPheno <- function(
   if ((method != "none") & random_signs) {
     stop("Random signs are incompatible with aggregated genotypes.")
   }
+  
+  # Filter genotypes.
+  anno_geno <- FilterGenos(
+    anno = anno,
+    geno = geno,
+    prop_causal = prop_causal
+  )
+  anno <- anno_geno$anno
+  geno <- anno_geno$geno
 
   # Calculate genetic effect.
   # Null phenotype.
@@ -197,14 +243,30 @@ GenPheno <- function(
   # SKAT-type phenotype.
   } else if(random_signs) {
 
-    long_beta <- rep(0, length(anno))
+    n_snps <- length(anno)
+    long_beta <- rep(0, n_snps)
+    
+    # Generate an effect size vector of length == the annotation vector.
     for (i in 0:2) {long_beta[anno == i] <- beta[i + 1]}
 
-    signs <- sample(c(-1, 1), length(anno), TRUE)
-    long_beta <- long_beta * signs
+    # Sample the sign. 
+    signs <- sample(x = c(-1, 1), size = n_snps, replace = TRUE)
+    
+    # Sample the frailty (positive random effect with expectation 1.0).  
+    if (random_var == 0) {
+      gamma <- 1
+    } else {
+      shape <- 1 / random_var
+      gamma <- stats::rgamma(n = n_snps, shape = shape, rate = shape)
+    }
+    
+    # Overall genetic effect sizes.
+    long_beta <- signs * gamma * long_beta 
 
+    # Convert to indicator genotypes, if required.
     if (indicator) {geno <- 1 * (geno > 0)}
-
+    
+    # Overall genetic contribution to the phenotype.
     eta_g <- as.numeric(geno %*% long_beta)
 
   # Burden-type phenotypes.
@@ -219,6 +281,8 @@ GenPheno <- function(
       weights = weights
     )
 
+    # Overall genetic contribution to the phenotype.
+    # If method is not none, beta is a scalar, else a vector.
     if (method != "none") {
       eta_g <- as.numeric(agg_geno * beta)
     } else {
@@ -233,12 +297,14 @@ GenPheno <- function(
   # Linear predictor.
   eta <- eta_g + eta_x
 
-  # Final phenotype.
+  # Add residual, if required.
   if (include_residual) {
     y <- eta + stats::rnorm(length(eta), sd = reg_param$sd)
   } else {
     y <- eta
   }
+  
+  # Convert to binary, if required.
   if (binary) {
     y <- 1 * (y >= 0)
   }
@@ -259,23 +325,34 @@ GenPheno <- function(
 #' \item{"pheno"}{A subject-length phenotype vector.}
 #' }
 #'
-#' @param n Sample size.
-#' @param snps Number of SNP in the gene.
+#' @param anno Annotation vector, if providing genotypes. Should match the
+#'   number of columns in geno.
 #' @param beta If method = "none", a (3 x 1) coefficient vector for bmvs, dmvs,
 #'   and ptvs respectively. If method != "none", a scalar effect size.
 #' @param binary Generate binary phenotype? Default: FALSE.
+#' @param geno Genotype matrix, if providing genotypes. 
 #' @param include_residual Include residual? If FALSE, returns the expected
 #'   value. Intended for testing.
 #' @param indicator Convert raw counts to indicators? Default: FALSE.
 #' @param maf_range Range of minor allele frequencies: c(MIN, MAX).
 #' @param method Genotype aggregation method. Default: "none".
+#' @param n Sample size.
+#' @param p_dmv Frequency of deleterious missense variants. Default of 40% is
+#'   based on the frequency of DMVs among rare coding variants in the UK
+#'   Biobank.
+#' @param p_ptv Frequency of protein truncating variants. Default of 10% is
+#'   based on the frequency of PTVs among rare coding variants in the UK
+#'   Biobank.
+#' @param prop_causal Proportion of variants which are causal. Default: 1.0. 
 #' @param random_signs Randomize signs? FALSE for burden-type genetic
 #'   architecture, TRUE for SKAT-type.
+#' @param random_var Frailty variance in the case of random signs. Default: 0.
+#' @param snps Number of SNP in the gene. Default: 100.
 #' @param weights Aggregation weights.
 #' @return List containing: genotypes, annotations, covariates, phenotypes.
 #' @examples 
 #' # Generate data.
-#' data <- DGP(n = 100, snps = 20)
+#' data <- DGP(n = 100)
 #' 
 #' # View components.
 #' table(data$anno)
@@ -284,20 +361,76 @@ GenPheno <- function(
 #' hist(data$pheno)
 #' @export
 DGP <- function(
-  n,
-  snps,
+  anno = NULL,
   beta = c(0, 1, 2),
   binary = FALSE,
+  geno = NULL,
   include_residual = TRUE,
   indicator = FALSE,
   maf_range = c(0.005, 0.010),
   method = "none",
+  n = 100,
+  p_dmv = 0.40,
+  p_ptv = 0.10,
+  prop_causal = 1.0,
   random_signs = FALSE,
-  weights = c(0, 1, 2)
+  random_var = 0.0, 
+  snps = 100,
+  weights = c(1, 2, 3)
 ) {
 
-  # Generate genotypes.
-  anno_geno <- GenGeno(n = n, snps = snps, maf_range = maf_range)
+  # Generate genotypes and annotations.
+  if (is.null(anno) & is.null(geno)) {
+    
+    # Neither annotations nor genotypes provided.
+    anno_geno <- GenGeno(
+      n = n,
+      snps = snps,
+      maf_range = maf_range,
+      p_dmv = p_dmv,
+      p_ptv = p_ptv
+    )
+    
+  } else if(is.null(anno) & !is.null(geno)) {
+    
+    # Only genotypes provided.
+    geno <- as.matrix(geno)
+    n <- nrow(geno)
+    snps <- ncol(geno)
+    anno <- GenAnno(snps, p_dmv = p_dmv, p_ptv = p_ptv)
+    anno_geno <- list(
+      anno = anno,
+      geno = geno
+    )
+    
+  } else if(!is.null(anno) & is.null(geno)) {
+    
+    # Only annotations provided.
+    snps <- length(anno)
+    geno <- GenGenoMat(
+      n = n,
+      snps = snps,
+      maf_range = maf_range
+    )
+    anno_geno <- list(
+      anno = anno,
+      geno = geno
+    )
+    
+  } else {
+    
+    # Annotations and genotypes provided.
+    geno <- as.matrix(geno)
+    stopifnot(length(anno) == ncol(geno))
+    snps <- ncol(geno)
+    n <- nrow(geno)
+    
+    anno_geno <- list(
+      anno = anno,
+      geno = geno
+    )
+    
+  }
 
   # Generate covariates.
   covar <- GenCovar(n)
@@ -316,7 +449,9 @@ DGP <- function(
     include_residual = include_residual,
     indicator = indicator,
     method = method,
+    prop_causal = prop_causal,
     random_signs = random_signs,
+    random_var = random_var, 
     weights = weights
   )
 

@@ -78,6 +78,15 @@ show(results)
 #    geno = geno,
 #    pheno = pheno,
 #    covar = covar,
+#    score_test = TRUE
+#  )
+
+## ---- eval = FALSE------------------------------------------------------------
+#  AllelicSeries::COAST(
+#    anno = anno,
+#    geno = geno,
+#    pheno = pheno,
+#    covar = covar,
 #    weights = c(1, 2, 3)
 #  )
 

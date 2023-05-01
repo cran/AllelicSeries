@@ -1,6 +1,6 @@
 Package: AllelicSeries
 Title: Allelic Series Test
-Version: 0.0.2.2
+Version: 0.0.3.0
 Authors@R: 
     c(person(given = "Zachary",
            family = "McCaw",
@@ -24,10 +24,10 @@ Suggests: knitr, rmarkdown, testthat (>= 3.0.0), withr
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 NeedsCompilation: yes
-Packaged: 2023-01-12 19:20:21 UTC; zmccaw
+Packaged: 2023-05-01 17:48:22 UTC; zmccaw
 Author: Zachary McCaw [aut, cre] (<https://orcid.org/0000-0002-2006-9828>),
   Christoph Klein [ctb] (<https://orcid.org/0000-0002-1748-625X>),
   insitro [cph]
 Maintainer: Zachary McCaw <zmccaw@insitro.com>
 Repository: CRAN
-Date/Publication: 2023-01-13 19:00:05 UTC
+Date/Publication: 2023-05-01 21:50:02 UTC
