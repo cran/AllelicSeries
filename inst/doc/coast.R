@@ -35,7 +35,13 @@ results <- AllelicSeries::COAST(
 )
 show(results)
 
-## ---- eval = FALSE------------------------------------------------------------
+## -----------------------------------------------------------------------------
+results@Counts
+
+## -----------------------------------------------------------------------------
+results@Pvals
+
+## ----eval = FALSE-------------------------------------------------------------
 #  AllelicSeries::COAST(
 #    anno = anno,
 #    geno = geno,
@@ -44,7 +50,7 @@ show(results)
 #    apply_int = TRUE
 #  )
 
-## ---- eval = FALSE------------------------------------------------------------
+## ----eval = FALSE-------------------------------------------------------------
 #  AllelicSeries::COAST(
 #    anno = anno,
 #    geno = geno,
@@ -54,7 +60,7 @@ show(results)
 #    include_orig_skato_ptv = TRUE,
 #  )
 
-## ---- eval = FALSE------------------------------------------------------------
+## ----eval = FALSE-------------------------------------------------------------
 #  AllelicSeries::COAST(
 #    anno = anno,
 #    geno = geno,
@@ -63,7 +69,16 @@ show(results)
 #    is_pheno_binary = TRUE
 #  )
 
-## ---- eval = FALSE------------------------------------------------------------
+## ----eval = FALSE-------------------------------------------------------------
+#  AllelicSeries::COAST(
+#    anno = anno,
+#    geno = geno,
+#    pheno = pheno,
+#    covar = covar,
+#    min_mac = 2
+#  )
+
+## ----eval = FALSE-------------------------------------------------------------
 #  AllelicSeries::COAST(
 #    anno = anno,
 #    geno = geno,
@@ -72,7 +87,7 @@ show(results)
 #    return_omni_only = TRUE
 #  )
 
-## ---- eval = FALSE------------------------------------------------------------
+## ----eval = FALSE-------------------------------------------------------------
 #  AllelicSeries::COAST(
 #    anno = anno,
 #    geno = geno,
@@ -81,7 +96,7 @@ show(results)
 #    score_test = TRUE
 #  )
 
-## ---- eval = FALSE------------------------------------------------------------
+## ----eval = FALSE-------------------------------------------------------------
 #  AllelicSeries::COAST(
 #    anno = anno,
 #    geno = geno,

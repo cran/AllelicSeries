@@ -13,6 +13,7 @@ ASBT(
   indicator = FALSE,
   is_pheno_binary = FALSE,
   method = "none",
+  min_mac = 0,
   score_test = FALSE,
   weights = DEFAULT_WEIGHTS
 )
@@ -33,8 +34,10 @@ Default: TRUE. Ignored if phenotype is binary.}
 
 \item{is_pheno_binary}{Is the phenotype binary? Default: FALSE.}
 
-\item{method}{Method for aggregating across categories: {"none", "max",
-"sum"}. Default: "none".}
+\item{method}{Method for aggregating across categories: ("none", "max",
+"sum"). Default: "none".}
+
+\item{min_mac}{Minimum minor allele count for inclusion. Default: 0.}
 
 \item{score_test}{Run a score test? If FALSE, performs a Wald test.}
 

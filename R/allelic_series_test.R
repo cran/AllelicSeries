@@ -1,5 +1,5 @@
 # Purpose: Allelic series test.
-# Updated: 2023-10-04
+# Updated: 2024-07-24
 
 # Default weights.
 DEFAULT_WEIGHTS <- c(1, 2, 3)
@@ -13,7 +13,8 @@ DEFAULT_WEIGHTS <- c(1, 2, 3)
 #' @param drop_empty Drop empty columns? Default: TRUE.
 #' @param indicator Convert raw counts to indicators? Default: FALSE.
 #' @param method Method for aggregating across categories:
-#'   {"none", "max", "sum"}. Default: "none".
+#'   ("none", "max", "sum"). Default: "none".
+#' @param min_mac Minimum minor allele count for inclusion. Default: 0. 
 #' @param weights Annotation category weights.
 #' @return (n x 3) Numeric matrix without weighting, (n x 1) numeric matrix
 #' with weighting.
@@ -24,8 +25,18 @@ Aggregator <- function(
     drop_empty = TRUE,
     indicator = FALSE,
     method = "none",
+    min_mac = 0,
     weights = DEFAULT_WEIGHTS
 ) {
+  
+  # Minor allele count filtering.
+  if (min_mac > 0) {
+    mac <- apply(geno, 2, sum)
+    keep <- (mac >= min_mac)
+    
+    anno <- anno[keep]
+    geno <- geno[, keep, drop = FALSE]
+  }
 
   # Sum to categories.
   bmv <- apply(geno[, anno == 0, drop = FALSE], 1, sum)
@@ -93,8 +104,9 @@ Aggregator <- function(
 #' @param covar (n x p) covariate matrix. Defaults to an (n x 1) intercept.
 #' @param indicator Convert raw counts to indicators?
 #' @param is_pheno_binary Is the phenotype binary? Default: FALSE.
-#' @param method Method for aggregating across categories: {"none", "max",
-#'   "sum"}. Default: "none".
+#' @param method Method for aggregating across categories: ("none", "max",
+#'   "sum"). Default: "none".
+#' @param min_mac Minimum minor allele count for inclusion. Default: 0. 
 #' @param score_test Run a score test? If FALSE, performs a Wald test.
 #' @param weights (3 x 1) annotation category weights.
 #' @return Numeric p-value.
@@ -120,6 +132,7 @@ ASBT <- function(
   indicator = FALSE,
   is_pheno_binary = FALSE,
   method = "none",
+  min_mac = 0,
   score_test = FALSE,
   weights = DEFAULT_WEIGHTS
 ) {
@@ -152,6 +165,7 @@ ASBT <- function(
     drop_empty = TRUE,
     indicator = indicator,
     method = method,
+    min_mac = min_mac,
     weights = weights
   )
 
@@ -191,6 +205,7 @@ ASBT <- function(
 #'   Default: TRUE. Ignored if phenotype is binary.
 #' @param covar (n x p) covariate matrix. Defaults to an (n x 1) intercept.
 #' @param is_pheno_binary Is the phenotype binary? Default: FALSE.
+#' @param min_mac Minimum minor allele count for inclusion. Default: 0. 
 #' @param return_null_model Return the null model in addition to the p-value?
 #'   Useful if running additional SKAT tests. Default: FALSE.
 #' @param weights (3 x 1) annotation category weights.
@@ -216,6 +231,7 @@ ASKAT <- function(
   apply_int = TRUE,
   covar = NULL,
   is_pheno_binary = FALSE,
+  min_mac = 0,
   return_null_model = FALSE,
   weights = DEFAULT_WEIGHTS
 ) {
@@ -241,6 +257,15 @@ ASKAT <- function(
     weights = weights
   )
 
+  # Minor allele count filtering.
+  if (min_mac >= 0) {
+    mac <- apply(geno, 2, sum)
+    keep <- (mac > min_mac)
+    
+    anno <- anno[keep]
+    geno <- geno[, keep, drop = FALSE]
+  }
+  
   # Alternate allele frequencies.
   aaf <- apply(geno, 2, mean) / 2
 
@@ -320,6 +345,12 @@ ASKAT <- function(
 #' @param include_orig_skato_ptv Include the original version of SKAT-O applied
 #' to PTV variants only in the omnibus test? Default: FALSE.
 #' @param is_pheno_binary Is the phenotype binary? Default: FALSE.
+#' @param min_mac Minimum minor allele count for inclusion. Default: 0. 
+#' @param pval_weights Optional vector of relative weights for combining the
+#'   component tests to perform the omnibus test. By default, 50% of weight is
+#'   given to the 6 burden tests, and 50% to the 1 SKAT test. If specified, the
+#'   weight vector should have length 7, and the length should be increased if
+#'   either `include_orig_skato_all` or `include_orig_skato_ptv` is active.
 #' @param return_omni_only Return only the omnibus p-value? Default: FALSE.
 #' @param score_test Use a score test for burden analysis? If FALSE, uses a 
 #'   Wald test.
@@ -348,6 +379,8 @@ COAST <- function(
   include_orig_skato_all = FALSE,
   include_orig_skato_ptv = FALSE,
   is_pheno_binary = FALSE,
+  min_mac = 0,
+  pval_weights = NULL,
   return_omni_only = FALSE,
   score_test = FALSE,
   weights = DEFAULT_WEIGHTS
@@ -381,6 +414,7 @@ COAST <- function(
       geno = geno,
       pheno = pheno,
       apply_int = apply_int,
+      min_mac = min_mac,
       is_pheno_binary = is_pheno_binary,
       score_test = score_test,
       ...
@@ -389,11 +423,11 @@ COAST <- function(
   }
 
   # Burden tests.
-  p_count <- BurdenWrap(
+  p_base <- BurdenWrap(
     indicator = FALSE, method = "none", weights = c(1, 1, 1))
 
   # Case of no non-zero variant classes.
-  if (is.na(p_count)) {return(NA)}
+  if (is.na(p_base)) {return(NA)}
 
   p_ind <- BurdenWrap(
     indicator = TRUE, method = "none", weights = c(1, 1, 1))
@@ -412,12 +446,12 @@ COAST <- function(
 
   # Collect p-values.
   p_burden <- c(
-    p_count = p_count,
-    p_ind = p_ind,
-    p_max_count = p_max_count,
-    p_max_ind = p_max_ind,
-    p_sum_count = p_sum_count,
-    p_sum_ind = p_sum_ind
+    baseline = p_base,
+    ind = p_ind,
+    max_count = p_max_count,
+    max_ind = p_max_ind,
+    sum_count = p_sum_count,
+    sum_ind = p_sum_ind
   )
 
   # SKAT tests.
@@ -427,16 +461,17 @@ COAST <- function(
     geno = geno,
     pheno = pheno,
     is_pheno_binary = is_pheno_binary,
+    min_mac = min_mac,
     return_null_model = TRUE,
     weights = weights
   )
-  p_skat <- c(p_allelic_skat = skat_list$p)
+  p_skat <- c(allelic_skat = skat_list$p)
   null <- skat_list$null
 
   # Standard SKAT-O all.
   if (include_orig_skato_all) {
     orig_skato_all <- SKAT::SKAT(geno, null, method = "SKATO")
-    p_skat <- c(p_skat, p_orig_skat_all = orig_skato_all$p.value)
+    p_skat <- c(p_skat, orig_skat_all = orig_skato_all$p.value)
   }
 
   # Standard SKAT-O PTV.
@@ -444,7 +479,7 @@ COAST <- function(
     ptv <- geno[, anno == 2, drop = FALSE]
     if (ncol(ptv) > 0) {
       orig_skato_ptv <- SKAT::SKAT(ptv, null, method = "SKATO")
-      p_skat <- c(p_skat, p_orig_skat_ptv = orig_skato_ptv$p.value)
+      p_skat <- c(p_skat, orig_skat_ptv = orig_skato_ptv$p.value)
     }
   }
 
@@ -452,16 +487,46 @@ COAST <- function(
   n_burden <- length(p_burden)
   n_skat <- length(p_skat)
 
-  p_val = c(p_burden, p_skat)
+  pvals = c(p_burden, p_skat)
   omni_weights <- c(rep(1, n_burden), rep(n_burden / n_skat, n_skat))
+  if (!is.null(pval_weights)) {
+    len_pval_weights <- length(pval_weights)
+    len_omni_weights <- length(omni_weights)
+    if (len_pval_weights == len_omni_weights) {
+      omni_weights <- pval_weights
+    } else {
+      msg <- paste0(
+        glue::glue("pval_weights has length {len_pval_weights}, but length {len_omni_weights} is needed. "),
+        "Default weights will be used instead."
+      )
+      warning(msg)
+    }
+  }
 
-  p_omni <- RNOmni::OmniP(p = p_val, w = omni_weights)
+  p_omni <- RNOmni::OmniP(p = pvals, w = omni_weights)
 
-  # Output.
+  # Only omnibus p-value requested.
   if (return_omni_only) {
     out <- c(p_omni = p_omni)
-  } else {
-    out <- c(p_val, p_omni = p_omni)
-  }
+    return(out)
+  } 
+  
+  # Format p-values.
+  pvals <- c(pvals, omni = p_omni)
+  df_pvals <- data.frame(
+    test = names(pvals),
+    type = c(rep("burden", n_burden), rep("skat", n_skat), "omni"),
+    pval = as.numeric(pvals)
+  )
+  
+  # Variant counts.
+  counts <- Counts(anno = anno, geno = geno, min_mac = min_mac)
+  
+  # Output.
+  out <- methods::new(
+    Class = "COAST",
+    Counts = counts,
+    Pvals = df_pvals
+  )
   return(out)
 }

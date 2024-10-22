@@ -193,8 +193,10 @@ test_that("Overall check of omnibus test.", {
     include_orig_skato_all = FALSE,
     include_orig_skato_ptv = FALSE
   )
-  expect_equal(length(p_omni), 8)
-  expect_equal(p_omni["p_omni"], 0.0, ignore_attr = TRUE, tolerance = 0.005)
+  pvals <- p_omni@Pvals
+  p_omni <- as.numeric(pvals$pval[pvals$test == "omni"])
+  expect_equal(length(pvals$pval), 8)
+  expect_equal(p_omni, 0.0, tolerance = 0.005)
 
   # With SKAT-O all.
   p_omni <- COAST(
@@ -204,8 +206,10 @@ test_that("Overall check of omnibus test.", {
     include_orig_skato_all = TRUE,
     include_orig_skato_ptv = FALSE
   )
-  expect_equal(length(p_omni), 9)
-  expect_equal(p_omni["p_omni"], 0.0, ignore_attr = TRUE, tolerance = 0.005)
+  pvals <- p_omni@Pvals
+  p_omni <- as.numeric(pvals$pval[pvals$test == "omni"])
+  expect_equal(length(pvals$pval), 8 + 1)
+  expect_equal(p_omni, 0.0, tolerance = 0.005)
 
   # With SKAT-O PTV.
   p_omni <- COAST(
@@ -215,8 +219,10 @@ test_that("Overall check of omnibus test.", {
     include_orig_skato_all = FALSE,
     include_orig_skato_ptv = TRUE
   )
-  expect_equal(length(p_omni), 9)
-  expect_equal(p_omni["p_omni"], 0.0, ignore_attr = TRUE, tolerance = 0.005)
+  pvals <- p_omni@Pvals
+  p_omni <- as.numeric(pvals$pval[pvals$test == "omni"])
+  expect_equal(length(pvals$pval), 8 + 1)
+  expect_equal(p_omni, 0.0, tolerance = 0.005)
 
   # With both SKAT-O all and SKAT-O PTV.
   p_omni <- COAST(
@@ -226,8 +232,10 @@ test_that("Overall check of omnibus test.", {
     include_orig_skato_all = TRUE,
     include_orig_skato_ptv = TRUE
   )
-  expect_equal(length(p_omni), 10)
-  expect_equal(p_omni["p_omni"], 0.0, ignore_attr = TRUE, tolerance = 0.005)
+  pvals <- p_omni@Pvals
+  p_omni <- as.numeric(pvals$pval[pvals$test == "omni"])
+  expect_equal(length(pvals$pval), 8 + 2)
+  expect_equal(p_omni, 0.0, tolerance = 0.005)
 
 })
 
@@ -253,4 +261,60 @@ test_that("Check application to common variants.", {
     )
   })
   
+})
+
+
+test_that("Check ability to change test weights.", {
+  
+  anno <- c(0, 1, 2)
+  geno <- rbind(
+    c(0, 0, 0),
+    c(0, 0, 1),
+    c(1, 0, 0),
+    c(0, 1, 0),
+    c(0, 0, 1)
+  )
+  n <- nrow(geno)
+  pheno <- c(-1, 1, 0, 0, 2)
+  
+  # Check case of placing all weight on 1 test.
+  base <- COAST(
+    anno = anno,
+    geno = geno,
+    pheno = pheno,
+    pval_weights = c(1, 0, 0, 0, 0, 0, 0)
+  )
+  pvals <- base@Pvals
+  expect_equal(
+    pvals$pval[pvals$test == "baseline"], 
+    pvals$pval[pvals$test == "omni"]
+  )
+  
+  # Check case of default weights.
+  default <- COAST(
+    anno = anno,
+    geno = geno,
+    pheno = pheno
+  )
+  pvals <- default@Pvals
+  p_default <- pvals$pval[pvals$test == "omni"]
+  
+  manual <- COAST(
+    anno = anno,
+    geno = geno,
+    pheno = pheno,
+    pval_weights = c(1, 1, 1, 1, 1, 1, 6)
+  )
+  pvals <- manual@Pvals
+  p_manual <- pvals$pval[pvals$test == "omni"]
+  expect_equal(p_default, p_manual)
+  
+  # Check case of providing insufficient weights.
+  expect_warning(COAST(
+    anno = anno,
+    geno = geno,
+    pheno = pheno,
+    pval_weights = c(1, 2, 3)
+  ))
+    
 })
