@@ -1,14 +1,15 @@
 # Purpose: Implement sumstats-based allelic series test.
-# Updated: 2024-08-02
-
-# Default weights.
-DEFAULT_WEIGHTS <- c(1, 2, 3)
+# Updated: 2024-11-13
 
 #' Allelic Series Burden Test from Summary Statistics
 #' 
 #' Allelic series burden test from summary statistics. 
+#' 
+#' @section Notes:
+#' * The allelic series burden does not require the minor allele frequencies.
 #'
-#' @param anno (snps x 1) annotation vector with values in c(0, 1, 2).
+#' @param anno (snps x 1) annotation vector with integer values in 1 through
+#'   the number of annotation categories L.
 #' @param beta (snps x 1) vector of effect sizes for the coding genetic variants
 #'   within a gene.
 #' @param se (snps x 1) vector of standard errors for the effect sizes.
@@ -19,12 +20,14 @@ DEFAULT_WEIGHTS <- c(1, 2, 3)
 #'   results in no rescaling.
 #' @param ld (snps x snps) matrix of correlations among the genetic variants.
 #'   Although ideally provided, an identity matrix is assumed if not.
-#' @param maf (snps x 1) vector of minor allele frequencies. Although ideally
-#'   provided, defaults to the zero vector.
 #' @param method Method for aggregating across categories:
 #'   ("none", "sum"). Default: "none".
-#' @param weights (3 x 1) vector of annotation category weights.
-#' @return Numeric p-value of the allelic series burden test.
+#' @param return_beta Return the estimated effect size? Default: FALSE.
+#' @param weights (L x 1) vector of annotation category weights. Note that the
+#'   number of annotation categories L is inferred from the length of `weights`.
+#' @return If `return_beta = TRUE`, a list of including the effect size
+#'   data.frame "betas" and the p-value "pval". If `return_beta = FALSE`, 
+#'   a numeric p-value.
 #' @examples
 #' # Generate data.
 #' data <- DGP(n = 1e3)
@@ -32,9 +35,8 @@ DEFAULT_WEIGHTS <- c(1, 2, 3)
 #' 
 #' # Run allelic series burden test from sumstats.
 #' results <- ASBTSS(
-#'   anno = sumstats$anno,
+#'   anno = sumstats$sumstats$anno,
 #'   beta = sumstats$sumstats$beta, 
-#'   maf = sumstats$maf,
 #'   se = sumstats$sumstats$se,
 #'   ld = sumstats$ld
 #' )
@@ -48,10 +50,13 @@ ASBTSS <- function(
   eps = 1,
   lambda = 1,
   ld = NULL,
-  maf = NULL,
   method = "none",
-  weights = DEFAULT_WEIGHTS
+  return_beta = FALSE,
+  weights = c(1, 2, 3)
 ){
+  
+  # Ensure annotations are one-indexed.
+  anno <- RelevelAnno(anno)
   
   # Check for LD and MAF.
   if (check) {
@@ -61,7 +66,8 @@ ASBTSS <- function(
       se = se,
       lambda = lambda,
       ld = ld,
-      maf = maf
+      weights = weights,
+      is_skat = FALSE
     )
   } else if (!is.null(ld)) {
     is_pd <- isPD(ld)
@@ -70,28 +76,31 @@ ASBTSS <- function(
   }
   
   n_snps <- length(anno)
+  n_anno <- length(weights)
   if (is.null(ld)) {ld <- diag(n_snps)}
-  if (is.null(maf)) {maf <- rep(0, n_snps)}
   if (!is_pd) {ld <- ld + eps * diag(n_snps)}
   
   # Run burden test.
   if (method == "none") {
     
-    pval <- BaselineSS(
-      anno = anno,
-      beta = beta,
-      ld = ld,
-      se = se
-    )
-    
-  } else if (method == "sum") {
-    
-    pval <- SumCountSS(
+    results <- BaselineSS(
       anno = anno,
       beta = beta,
       ld = ld,
       se = se,
-      weights = weights
+      n_anno = n_anno,
+      return_beta = TRUE
+    )
+    
+  } else if (method == "sum") {
+    
+    results <- SumCountSS(
+      anno = anno,
+      beta = beta,
+      ld = ld,
+      se = se,
+      weights = weights,
+      return_beta = TRUE
     )
     
   } else {
@@ -99,11 +108,27 @@ ASBTSS <- function(
     stop("Select method from among 'none' or 'sum'.")
     
   }
-  
+
   # Apply genomic control.
   lambda <- max(1, lambda)
+  pval <- results$pval
   pval <- GenomicControl(lambda = lambda, pval = pval)
-  return(pval)
+  
+  # Output.
+  if (return_beta) {
+    effects <- data.frame(
+      beta = results$beta,
+      se = results$se
+    )
+    out <- list(
+      betas = effects,
+      pval = pval
+    )
+  } else {
+    out <- pval
+  }
+  
+  return(out)
 }
 
 
@@ -113,7 +138,14 @@ ASBTSS <- function(
 #' 
 #' Allelic series sequence kernel association test from summary statistics.
 #' 
-#' @param anno (snps x 1) annotation vector with values in c(0, 1, 2).
+#' @section Notes: 
+#' * The SKAT test requires per-variant minor allele frequencies (MAFs) for 
+#'   the purpose of up-weighting rarer variants. If unknown, `maf` can be 
+#'   safely omitted. The only consequence is that the SKAT weights will no 
+#'   longer be inversely proportional to the genotypic variance.
+#' 
+#' @param anno (snps x 1) annotation vector with integer values in 1 through
+#'   the number of annotation categories L.
 #' @param beta (snps x 1) vector of effect sizes for the coding genetic variants
 #'   within a gene.
 #' @param se (snps x 1) vector of standard errors for the effect sizes.
@@ -126,7 +158,8 @@ ASBTSS <- function(
 #'   provided, defaults to the zero vector.
 #' @param ld (snps x snps) matrix of correlations among the genetic variants.
 #'   Although ideally provided, an identity matrix is assumed if not.
-#' @param weights (3 x 1) vector of annotation category weights.
+#' @param weights (L x 1) vector of annotation category weights. Note that the
+#'   number of annotation categories L is inferred from the length of `weights`.
 #' @return Numeric p-value of the allelic series SKAT-O test.
 #' @examples
 #' # Generate data.
@@ -134,10 +167,11 @@ ASBTSS <- function(
 #' sumstats <- CalcSumstats(data = data)
 #' 
 #' # Run allelic series SKAT test from sumstats.
+#' # Note: the SKAT test requires MAF.
 #' results <- ASKATSS(
-#'   anno = sumstats$anno,
+#'   anno = sumstats$sumstats$anno,
 #'   beta = sumstats$sumstats$beta, 
-#'   maf = sumstats$maf,
+#'   maf = sumstats$sumstats$maf,
 #'   se = sumstats$sumstats$se,
 #'   ld = sumstats$ld
 #' )
@@ -152,8 +186,11 @@ ASKATSS <- function(
     lambda = 1,
     ld = NULL,
     maf = NULL,
-    weights = DEFAULT_WEIGHTS
+    weights = c(1, 2, 3)
 ){
+  
+  # Ensure annotations are one-indexed.
+  anno <- RelevelAnno(anno)
   
   # Input checks.
   if (check) {
@@ -163,6 +200,8 @@ ASKATSS <- function(
       se = se,
       lambda = lambda,
       ld = ld,
+      weights = weights,
+      is_skat = TRUE,
       maf = maf
     )
   } 
@@ -236,7 +275,8 @@ ASKATSS <- function(
 #' calculate an omnibus p-value. Note that not all tests included in
 #' \code{\link{COAST}} are available when working with summary statistics.
 #'
-#' @param anno (snps x 1) annotation vector with values in c(0, 1, 2).
+#' @param anno (snps x 1) annotation vector with integer values in 1 through
+#'   the number of annotation categories L.
 #' @param beta (snps x 1) vector of effect sizes for the coding genetic variants
 #'   within a gene.
 #' @param se (snps x 1) vector of standard errors for the effect sizes.
@@ -250,9 +290,10 @@ ASKATSS <- function(
 #' @param maf (snps x 1) vector of minor allele frequencies. Although ideally
 #'   provided, defaults to the zero vector.
 #' @param pval_weights (3 x 1) vector of relative weights for combining the
-#'   component tests to perform the omnibus test.
-#' @param weights (3 x 1) vector of annotation category weights. The default of
-#'   c(1, 1, 2) gives the SKAT test equal weight to the two burden tests. 
+#'   component tests to perform the omnibus test. The default of
+#'   c(0.25, 0.25, 0.50) gives the SKAT test equal weight to the two burden tests. 
+#' @param weights (L x 1) vector of annotation category weights. Note that the
+#'   number of annotation categories L is inferred from the length of `weights`.
 #' @return Numeric p-value.
 #' @examples 
 #' # Generate data.
@@ -261,11 +302,11 @@ ASKATSS <- function(
 #' 
 #' # Run the Coding-variant Allelic Series Test from summary statistics.
 #' results <- COASTSS(
-#'   anno = sumstats$anno,
+#'   anno = sumstats$sumstats$anno,
 #'   beta = sumstats$sumstats$beta, 
-#'   maf = sumstats$maf,
 #'   se = sumstats$sumstats$se,
-#'   ld = sumstats$ld
+#'   ld = sumstats$ld,
+#'   maf = sumstats$sumstats$maf,
 #' )
 #' show(results)
 #' @export
@@ -276,11 +317,14 @@ COASTSS <- function(
     check = TRUE,
     eps = 1,
     lambda = c(1, 1, 1),
-    maf = NULL,
     ld = NULL,
-    pval_weights = c(1, 1, 2),
-    weights = DEFAULT_WEIGHTS
+    maf = NULL,
+    pval_weights = c(0.25, 0.25, 0.50),
+    weights = c(1, 2, 3)
 ) {
+  
+  # Ensure annotations are one-indexed.
+  anno <- RelevelAnno(anno)
   
   # Input checks.
   if (check) {
@@ -290,35 +334,43 @@ COASTSS <- function(
       se = se,
       lambda = lambda,
       ld = ld,
-      maf = maf
+      weights = weights,
+      maf = maf,
+      is_skat = TRUE
     )
   }
   
   # Baseline model p-value.
-  p_base <- ASBTSS(
+  n_anno <- length(weights)
+  unif_weights <- rep(1, n_anno)
+  burden_results <- list()
+  
+  burden_results$base <- ASBTSS(
     anno = anno,
     beta = beta,
     se = se,
     check = FALSE,
     eps = eps,
     ld = ld,
-    maf = maf,
     method = "none",
-    weights = c(1, 1, 1)
+    return_beta = TRUE,
+    weights = unif_weights
   )
+  p_base <- burden_results$base$pval
     
   # Sum model p-value.
-  p_burden <- ASBTSS(
+  burden_results$sum <- ASBTSS(
     anno = anno,
     beta = beta,
     se = se,
     check = FALSE,
     eps = eps,
     ld = ld,
-    maf = maf,
     method = "sum",
+    return_beta = TRUE,
     weights = weights
   )
+  p_burden <- burden_results$sum$pval
   
   # SKAT model p-value.
   p_skat <- tryCatch({
@@ -347,16 +399,27 @@ COASTSS <- function(
   key <- sapply(pvals, function(x) {!is.na(x)})
   p_omni <- RNOmni::OmniP(pvals[key], pval_weights[key])
   
-  # Output.
+  # P-values.
   df_pvals <- data.frame(
     test = c("baseline", "sum_count", "allelic_skat", "omni"),
     type = c("burden", "burden", "skat", "omni"),
     pval = c(pvals, p_omni)
   )
   
+  # Format betas.
+  burden_labs <- names(burden_results)
+  betas <- lapply(burden_labs, function(lab) {
+    out <- burden_results[[lab]]$betas
+    out$test <- lab
+    out <- out[, c("test", "beta", "se")]
+    return(out)
+  })
+  betas <- do.call(rbind, betas)
+  
   # Output.
   out <- methods::new(
     Class = "COAST",
+    Betas = betas,
     Counts = NULL,
     Pvals = df_pvals
   )

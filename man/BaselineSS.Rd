@@ -4,10 +4,11 @@
 \alias{BaselineSS}
 \title{Baseline Counts Test from Sumstats}
 \usage{
-BaselineSS(anno, beta, ld, se)
+BaselineSS(anno, beta, ld, se, n_anno = 3L, return_beta = FALSE)
 }
 \arguments{
-\item{anno}{(snps x 1) annotation vector.}
+\item{anno}{(snps x 1) annotation vector with integer values in 1 through
+the number of annotation categories L.}
 
 \item{beta}{(snps x 1) vector of effect sizes for
 the coding genetic variants within a gene.}
@@ -15,9 +16,15 @@ the coding genetic variants within a gene.}
 \item{ld}{(snps x snps) matrix of correlations among the genetic variants.}
 
 \item{se}{(snps x 1) vector of standard errors for the effect sizes.}
+
+\item{n_anno}{Number of annotation categories L.}
+
+\item{return_beta}{Return estimated effect sizes and standard errors?
+Default: FALSE.}
 }
 \value{
-Numeric p-value.
+If \code{return_beta}, a list containing the category effect sizes,
+standard errors, and the p-value. Otherwise, the numeric p-value only.
 }
 \description{
 Baseline Counts Test from Sumstats

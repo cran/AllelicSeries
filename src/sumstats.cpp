@@ -59,12 +59,16 @@ SEXP isPD(
 // Annotation matrix
 // 
 // @param anno (snps x 1) annotation vector.
+// @param n_anno Number of annotation categories L.
 // [[Rcpp::export]]
-arma::mat AnnoMat(const arma::colvec &anno) {
+arma::mat AnnoMat(
+  const arma::colvec &anno,
+  const int n_anno = 3
+) {
 
-  arma::mat out = arma::zeros(anno.n_elem, 3);
+  arma::mat out = arma::zeros(anno.n_elem, n_anno);
   for (int j=0; j<anno.n_elem; j++) {
-    out(j, anno(j)) = 1.0;
+    out(j, anno(j) - 1) = 1.0;
   };
 
   return out;
@@ -73,19 +77,26 @@ arma::mat AnnoMat(const arma::colvec &anno) {
 
 //' Baseline Counts Test from Sumstats
 //'
-//' @param anno (snps x 1) annotation vector.
+//' @param anno (snps x 1) annotation vector with integer values in 1 through
+//'   the number of annotation categories L.
 //' @param beta (snps x 1) vector of effect sizes for 
 //'   the coding genetic variants within a gene.
 //' @param ld (snps x snps) matrix of correlations among the genetic variants.
 //' @param se (snps x 1) vector of standard errors for the effect sizes.
-//' @return Numeric p-value.
+//' @param n_anno Number of annotation categories L.
+//' @param return_beta Return estimated effect sizes and standard errors?
+//'   Default: FALSE.
+//' @return If `return_beta`, a list containing the category effect sizes,
+//'   standard errors, and the p-value. Otherwise, the numeric p-value only.
 //' @export
 // [[Rcpp::export]]
 SEXP BaselineSS(
   const arma::colvec &anno,
   const arma::colvec &beta,
   const arma::mat &ld,
-  const arma::colvec &se
+  const arma::colvec &se,
+  const int n_anno = 3,
+  const bool return_beta = false
 ){
 
   // Filter to require non-zero standard error.
@@ -100,7 +111,7 @@ SEXP BaselineSS(
   const arma::colvec eta = beta_nz / v;
   
   // Category score statistics.
-  const arma::mat d = AnnoMat(anno);
+  const arma::mat d = AnnoMat(anno, n_anno);
   const arma::mat u = d.t() * eta;
   
   // Calculate covariance matrix.
@@ -116,19 +127,37 @@ SEXP BaselineSS(
   int df = u.n_elem;
   Rcpp::Environment base("package:stats");
   Rcpp::Function pchisq = base["pchisq"]; 
-  return pchisq(Rcpp::_["q"]=tstat, Rcpp::_["df"]=df, Rcpp::_["lower.tail"]=false);
+  SEXP pval = pchisq(Rcpp::_["q"]=tstat, Rcpp::_["df"]=df, Rcpp::_["lower.tail"]=false);
+
+  if (!return_beta) {return pval;};
+
+  // Calculate betas and standard errors.
+  const arma::colvec beta_hat = inv_cov * u;
+  const arma::colvec beta_hat_se = arma::sqrt(arma::diagvec(inv_cov));
+  
+  // Output.
+  return Rcpp::List::create(
+    Rcpp::Named("beta") = beta_hat,
+    Rcpp::Named("se") = beta_hat_se,
+    Rcpp::Named("pval") = pval
+  );
 };
 
 
 //' Allelic Sum Test from Sumstats
 //'
-//' @param anno (snps x 1) annotation vector.
+//' @param anno (snps x 1) annotation vector with integer values in 1 through
+//'   the number of annotation categories L.
 //' @param beta (snps x 1) vector of effect sizes for 
 //'   the coding genetic variants within a gene.
 //' @param ld (snps x snps) matrix of correlations among the genetic variants.
 //' @param se (snps x 1) vector of standard errors for the effect sizes.
-//' @param weights (3 x 1) vector of annotation category weights.
-//' @return Numeric p-value.
+//' @param weights (L x 1) vector of annotation category weights. Note that the
+//'   number of annotation categories L is inferred from the length of `weights`.
+//' @param return_beta Return estimated effect sizes and standard errors?
+//'   Default: FALSE.
+//' @return If `return_beta`, a list containing the category effect sizes,
+//'   standard errors, and the p-value. Otherwise, the numeric p-value only.
 //' @export
 // [[Rcpp::export]]
 SEXP SumCountSS(
@@ -136,11 +165,13 @@ SEXP SumCountSS(
   const arma::colvec &beta,
   const arma::mat &ld,
   const arma::colvec &se,
-  const arma::colvec &weights
+  const arma::colvec &weights,
+  const bool return_beta = false
 ){
 
   // Alias.
   const arma::colvec w = weights;
+  const int n_anno = weights.n_elem;
   
   // Filter to require non-zero standard error.
   arma::uvec key = arma::find(se > 0);
@@ -154,7 +185,7 @@ SEXP SumCountSS(
   const arma::colvec eta = beta_nz / v;
   
   // Category score statistics.
-  const arma::mat d = AnnoMat(anno);
+  const arma::mat d = AnnoMat(anno, n_anno);
   const arma::mat u = w.t() * d.t() * eta;
   
   // Calculate covariance matrix.
@@ -170,5 +201,19 @@ SEXP SumCountSS(
   int df = u.n_elem;
   Rcpp::Environment base("package:stats");
   Rcpp::Function pchisq = base["pchisq"]; 
-  return pchisq(Rcpp::_["q"]=tstat, Rcpp::_["df"]=df, Rcpp::_["lower.tail"]=false);
+  SEXP pval = pchisq(Rcpp::_["q"]=tstat, Rcpp::_["df"]=df, Rcpp::_["lower.tail"]=false);
+
+  if (!return_beta) {return pval;};
+
+  // Calculate betas and standard errors.
+  const arma::colvec beta_hat = inv_cov * u;
+  const arma::colvec beta_hat_se = arma::sqrt(arma::diagvec(inv_cov));
+  
+  // Output.
+  return Rcpp::List::create(
+    Rcpp::Named("beta") = beta_hat,
+    Rcpp::Named("se") = beta_hat_se,
+    Rcpp::Named("pval") = pval
+  );
+
 };

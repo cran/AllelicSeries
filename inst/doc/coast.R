@@ -36,10 +36,36 @@ results <- AllelicSeries::COAST(
 show(results)
 
 ## -----------------------------------------------------------------------------
+results@Betas
+
+## -----------------------------------------------------------------------------
 results@Counts
 
 ## -----------------------------------------------------------------------------
 results@Pvals
+
+## ----cache=TRUE---------------------------------------------------------------
+withr::local_seed(102)
+
+# Generate data.
+n <- 1e2
+data <- AllelicSeries::DGP(
+  n = n,
+  snps = 400,
+  beta = c(1, 2, 3, 4) / sqrt(n),
+  prop_anno = c(0.4, 0.3, 0.2, 0.1),
+  weights = c(1, 1, 1, 1)
+)
+
+# Run COAST-SS.
+results <- AllelicSeries::COAST(
+  anno = data$anno,
+  covar = data$covar,
+  geno = data$geno,
+  pheno = data$pheno,
+  weights = c(1, 2, 3, 4)
+)
+show(results)
 
 ## ----eval = FALSE-------------------------------------------------------------
 #  AllelicSeries::COAST(
@@ -58,6 +84,7 @@ results@Pvals
 #    covar = covar,
 #    include_orig_skato_all = TRUE,
 #    include_orig_skato_ptv = TRUE,
+#    ptv_anno = 3
 #  )
 
 ## ----eval = FALSE-------------------------------------------------------------
