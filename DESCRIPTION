@@ -1,6 +1,6 @@
 Package: AllelicSeries
 Title: Allelic Series Test
-Version: 0.1.1.1
+Version: 0.1.1.2
 Authors@R: 
     c(person(given = "Zachary",
            family = "McCaw",
@@ -35,7 +35,7 @@ Suggests: knitr, rmarkdown, testthat (>= 3.0.0), withr
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 NeedsCompilation: yes
-Packaged: 2024-11-22 01:29:39 UTC; zmccaw
+Packaged: 2024-11-23 02:24:26 UTC; zmccaw
 Author: Zachary McCaw [aut, cre] (<https://orcid.org/0000-0002-2006-9828>),
   Christoph Klein [ctb] (<https://orcid.org/0000-0002-1748-625X>),
   Thomas Soare [ctb] (<https://orcid.org/0000-0002-4903-8646>),
@@ -43,4 +43,4 @@ Author: Zachary McCaw [aut, cre] (<https://orcid.org/0000-0002-2006-9828>),
   insitro [cph]
 Maintainer: Zachary McCaw <zmccaw@insitro.com>
 Repository: CRAN
-Date/Publication: 2024-11-22 03:20:02 UTC
+Date/Publication: 2024-11-23 15:20:15 UTC

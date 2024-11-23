@@ -1,4 +1,4 @@
-126234c8baf7ecd7ea9bbf85e67ba82a *DESCRIPTION
+5aeb447dea242da020152a75d54d7c88 *DESCRIPTION
 1dba070f53de557237e2758e9a43e23d *LICENSE
 46380fcdc86d3e57a4ac7aa3cf909e14 *NAMESPACE
 570de4b8d57a4f92e1a75e070888f142 *NEWS.md
@@ -70,7 +70,7 @@ e2f2f3637e22bb114cb199b5e505da7d *src/sumstats.cpp
 668924d84c4f6e75dc6fc146f6b8d73a *tests/testthat/test-allelic_series_sumstats.R
 7f312cff39bbd67c2bb56493c795e17f *tests/testthat/test-binary.R
 c929679ce0e1b0a1032fc148dd39f5c3 *tests/testthat/test-counts.R
-5ed8e328e61ec98c547f9fbc4a82ca9e *tests/testthat/test-data_generation.R
+cd64403b2c6d62f6e92e7375ec7dcd8a *tests/testthat/test-data_generation.R
 0606816fa7bfc7a585b9a3770cbbe4b6 *tests/testthat/test-score_test.R
 a6f94fabbba2cf4be1cfbf0bc2a15109 *tests/testthat/test-utils.R
 3269a3ad446bab81ccea65462b4194d6 *vignettes/coast.Rmd
