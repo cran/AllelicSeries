@@ -340,7 +340,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<p>Updated: 2024-11-20</p>
+<p>Updated: 2025-03-26</p>
 <div id="data" class="section level2">
 <h2>Data</h2>
 <p>To run an allelic series test, there are 4 key inputs:</p>
@@ -350,8 +350,9 @@ variants, coded as 1 for benign missense variants (BMVs), 2 for damaging
 missense variants (DMVs), and 3 for protein truncating variants
 (PTVs).</p></li>
 <li><p>A covariates matrix, with as many rows as subjects and including
-columns such as age and sex. If omitted, defaults to an intercept
-only.</p></li>
+columns such as age and sex. If omitted, defaults to an intercept only.
+If provided, an intercept will automatically be added if not
+detected.</p></li>
 <li><p>A genotype matrix, with subjects as rows and variants as columns.
 The number of columns should correspond to the length of the annotation
 vector.</p></li>
@@ -373,27 +374,28 @@ an allelic series, with magnitudes proportional to
 <span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="co"># Annotations.</span></span>
 <span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>anno <span class="ot">&lt;-</span> data<span class="sc">$</span>anno</span>
 <span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="fu">head</span>(anno)</span></code></pre></div>
-<pre><code>## [1] 1 1 2 2 1 2</code></pre>
+<pre><code>## rs1 rs2 rs3 rs4 rs5 rs6 
+##   1   1   2   2   1   2</code></pre>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># Covariates.</span></span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>covar <span class="ot">&lt;-</span> data<span class="sc">$</span>covar</span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">head</span>(covar)</span></code></pre></div>
-<pre><code>##      int         age sex          pc1        pc2         pc3
-## [1,]   1 -0.77465210   1  0.539531581  1.2134116  0.63478280
-## [2,]   1 -0.03492052   0  0.009270313  1.5256400 -0.62027221
-## [3,]   1 -0.20782643   1 -0.777242512  1.2319750 -0.73311857
-## [4,]   1  0.69939529   0 -0.357743663  0.1747664 -0.29754242
-## [5,]   1  0.47420055   1 -1.083115262 -1.3005348 -0.68338808
-## [6,]   1 -1.15038152   0 -0.539141451 -0.5159589  0.01971706</code></pre>
+<pre><code>##      intercept         age sex          pc1        pc2         pc3
+## [1,]         1 -0.77465210   1  0.539531581  1.2134116  0.63478280
+## [2,]         1 -0.03492052   0  0.009270313  1.5256400 -0.62027221
+## [3,]         1 -0.20782643   1 -0.777242512  1.2319750 -0.73311857
+## [4,]         1  0.69939529   0 -0.357743663  0.1747664 -0.29754242
+## [5,]         1  0.47420055   1 -1.083115262 -1.3005348 -0.68338808
+## [6,]         1 -1.15038152   0 -0.539141451 -0.5159589  0.01971706</code></pre>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># Genotypes.</span></span>
 <span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>geno <span class="ot">&lt;-</span> data<span class="sc">$</span>geno</span>
 <span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">head</span>(geno[,<span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>])</span></code></pre></div>
-<pre><code>##      [,1] [,2] [,3] [,4] [,5]
-## [1,]    0    0    0    0    0
-## [2,]    0    0    0    0    0
-## [3,]    0    0    0    0    0
-## [4,]    0    0    0    0    0
-## [5,]    0    0    0    0    0
-## [6,]    0    1    0    0    0</code></pre>
+<pre><code>##      rs1 rs2 rs3 rs4 rs5
+## [1,]   0   0   0   0   0
+## [2,]   0   0   0   0   0
+## [3,]   0   0   0   0   0
+## [4,]   0   0   0   0   0
+## [5,]   0   0   0   0   0
+## [6,]   0   1   0   0   0</code></pre>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># Phenotype.</span></span>
 <span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>pheno <span class="ot">&lt;-</span> data<span class="sc">$</span>pheno</span>
 <span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">head</span>(pheno)</span></code></pre></div>
@@ -480,6 +482,64 @@ provided the greatest power.</p>
 ## 6      sum_ind burden 0.001089858
 ## 7 allelic_skat   skat 0.068349669
 ## 8         omni   omni 0.004683243</code></pre>
+<div id="ultra-rare-variants" class="section level3">
+<h3>Ultra-rare variants</h3>
+<p>Effect size estimation for ultra-rare variants is challenging due to
+the scarcity of carriers on which to base the estimate. Following works
+such as <a href="https://doi.org/10.1038/s41588-022-01178-w">SAIGE-GENE+</a>, we
+recommend collapsing variants with a minor allele count (MAC) <span class="math inline">\(\leq 10\)</span> into an aggregate variant,
+separately within each annotation category. The
+<code>CollapseGeno</code> utility is provided for this purpose. The
+<code>min_mac</code> specifies the threshold for retention as an
+individual variant (e.g. <code>min_mac = 11</code> will collapse
+variants with a MAC <span class="math inline">\(\leq 10\)</span>). The
+output is a list containing the annotation vector <code>anno</code> and
+genotype matrix <code>geno</code> after collapsing. In addition, a
+mapping <code>vars</code> is provided showing which variants were
+collapsed to create each aggregate variant. Note that:</p>
+<ul>
+<li><p><code>CollapseGeno</code> will change the order of the variants
+in the genotype matrix.</p></li>
+<li><p>No aggregate variant will be created within annotation categories
+where no variants have a MAC below the threshold.</p></li>
+<li><p>Collapsing ultra-rare variants does not guarantee that the
+resulting aggregate variant will itself have a MAC <span class="math inline">\(\geq\)</span> the threshold. To ensure that only
+variants with a minimum MAC enter the association test, a
+<code>min_mac</code> threshold should also be supplied to
+<code>COAST</code>.</p></li>
+</ul>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">102</span>)</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a></span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="co"># Generate data.</span></span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fl">1e3</span></span>
+<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a>data <span class="ot">&lt;-</span> AllelicSeries<span class="sc">::</span><span class="fu">DGP</span>(</span>
+<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a>  <span class="at">n =</span> n,</span>
+<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>  <span class="at">snps =</span> <span class="dv">10</span>,</span>
+<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a>  <span class="at">prop_anno =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>) <span class="sc">/</span> <span class="dv">3</span></span>
+<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a>)</span>
+<span id="cb17-10"><a href="#cb17-10" tabindex="-1"></a></span>
+<span id="cb17-11"><a href="#cb17-11" tabindex="-1"></a><span class="co"># Collapse ultra-rare variants.</span></span>
+<span id="cb17-12"><a href="#cb17-12" tabindex="-1"></a>collapsed <span class="ot">&lt;-</span> AllelicSeries<span class="sc">::</span><span class="fu">CollapseGeno</span>(</span>
+<span id="cb17-13"><a href="#cb17-13" tabindex="-1"></a>  <span class="at">anno =</span> data<span class="sc">$</span>anno, </span>
+<span id="cb17-14"><a href="#cb17-14" tabindex="-1"></a>  <span class="at">geno =</span> data<span class="sc">$</span>geno,</span>
+<span id="cb17-15"><a href="#cb17-15" tabindex="-1"></a>  <span class="at">min_mac =</span> <span class="dv">11</span></span>
+<span id="cb17-16"><a href="#cb17-16" tabindex="-1"></a>)</span>
+<span id="cb17-17"><a href="#cb17-17" tabindex="-1"></a></span>
+<span id="cb17-18"><a href="#cb17-18" tabindex="-1"></a><span class="co"># Variants collapsed to form each aggregate variant.</span></span>
+<span id="cb17-19"><a href="#cb17-19" tabindex="-1"></a><span class="fu">head</span>(collapsed<span class="sc">$</span>vars)</span></code></pre></div>
+<pre><code>##   anno            vars
+## 1    1     rs1;rs4;rs5
+## 2    2             rs8
+## 3    3 rs2;rs3;rs7;rs9</code></pre>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="co"># Run COAST on the collapsed data.</span></span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>results <span class="ot">&lt;-</span> AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a>  <span class="at">anno =</span> collapsed<span class="sc">$</span>anno,</span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a>  <span class="at">covar =</span> data<span class="sc">$</span>covar,</span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>  <span class="at">geno =</span> collapsed<span class="sc">$</span>geno,</span>
+<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a>  <span class="at">pheno =</span> data<span class="sc">$</span>pheno,</span>
+<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a>  <span class="at">min_mac =</span> <span class="dv">10</span></span>
+<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a>)</span></code></pre></div>
+</div>
 <div id="different-numbers-of-annotation-categories" class="section level3">
 <h3>Different numbers of annotation categories</h3>
 <p><code>COAST</code> was originally intended to operate on the benign
@@ -493,27 +553,27 @@ and should have length equal to the number of <em>possible</em>
 annotation categories. <code>COAST</code> will run, albeit with a
 warning, if there are possible annotation categories to which no
 variants are assigned (e.g. a gene contains no PTVs).</p>
-<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>withr<span class="sc">::</span><span class="fu">local_seed</span>(<span class="dv">102</span>)</span>
-<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a></span>
-<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="co"># Generate data.</span></span>
-<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fl">1e2</span></span>
-<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a>data <span class="ot">&lt;-</span> AllelicSeries<span class="sc">::</span><span class="fu">DGP</span>(</span>
-<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a>  <span class="at">n =</span> n,</span>
-<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>  <span class="at">snps =</span> <span class="dv">400</span>,</span>
-<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a>  <span class="at">beta =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>) <span class="sc">/</span> <span class="fu">sqrt</span>(n),</span>
-<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a>  <span class="at">prop_anno =</span> <span class="fu">c</span>(<span class="fl">0.4</span>, <span class="fl">0.3</span>, <span class="fl">0.2</span>, <span class="fl">0.1</span>),</span>
-<span id="cb17-10"><a href="#cb17-10" tabindex="-1"></a>  <span class="at">weights =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
-<span id="cb17-11"><a href="#cb17-11" tabindex="-1"></a>)</span>
-<span id="cb17-12"><a href="#cb17-12" tabindex="-1"></a></span>
-<span id="cb17-13"><a href="#cb17-13" tabindex="-1"></a><span class="co"># Run COAST-SS.</span></span>
-<span id="cb17-14"><a href="#cb17-14" tabindex="-1"></a>results <span class="ot">&lt;-</span> AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
-<span id="cb17-15"><a href="#cb17-15" tabindex="-1"></a>  <span class="at">anno =</span> data<span class="sc">$</span>anno,</span>
-<span id="cb17-16"><a href="#cb17-16" tabindex="-1"></a>  <span class="at">covar =</span> data<span class="sc">$</span>covar,</span>
-<span id="cb17-17"><a href="#cb17-17" tabindex="-1"></a>  <span class="at">geno =</span> data<span class="sc">$</span>geno,</span>
-<span id="cb17-18"><a href="#cb17-18" tabindex="-1"></a>  <span class="at">pheno =</span> data<span class="sc">$</span>pheno,</span>
-<span id="cb17-19"><a href="#cb17-19" tabindex="-1"></a>  <span class="at">weights =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>)</span>
-<span id="cb17-20"><a href="#cb17-20" tabindex="-1"></a>)</span>
-<span id="cb17-21"><a href="#cb17-21" tabindex="-1"></a><span class="fu">show</span>(results)</span></code></pre></div>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">102</span>)</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a></span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a><span class="co"># Generate data.</span></span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fl">1e2</span></span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>data <span class="ot">&lt;-</span> AllelicSeries<span class="sc">::</span><span class="fu">DGP</span>(</span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>  <span class="at">n =</span> n,</span>
+<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a>  <span class="at">snps =</span> <span class="dv">400</span>,</span>
+<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a>  <span class="at">beta =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>) <span class="sc">/</span> <span class="fu">sqrt</span>(n),</span>
+<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a>  <span class="at">prop_anno =</span> <span class="fu">c</span>(<span class="fl">0.4</span>, <span class="fl">0.3</span>, <span class="fl">0.2</span>, <span class="fl">0.1</span>),</span>
+<span id="cb20-10"><a href="#cb20-10" tabindex="-1"></a>  <span class="at">weights =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb20-11"><a href="#cb20-11" tabindex="-1"></a>)</span>
+<span id="cb20-12"><a href="#cb20-12" tabindex="-1"></a></span>
+<span id="cb20-13"><a href="#cb20-13" tabindex="-1"></a><span class="co"># Run COAST-SS.</span></span>
+<span id="cb20-14"><a href="#cb20-14" tabindex="-1"></a>results <span class="ot">&lt;-</span> AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
+<span id="cb20-15"><a href="#cb20-15" tabindex="-1"></a>  <span class="at">anno =</span> data<span class="sc">$</span>anno,</span>
+<span id="cb20-16"><a href="#cb20-16" tabindex="-1"></a>  <span class="at">covar =</span> data<span class="sc">$</span>covar,</span>
+<span id="cb20-17"><a href="#cb20-17" tabindex="-1"></a>  <span class="at">geno =</span> data<span class="sc">$</span>geno,</span>
+<span id="cb20-18"><a href="#cb20-18" tabindex="-1"></a>  <span class="at">pheno =</span> data<span class="sc">$</span>pheno,</span>
+<span id="cb20-19"><a href="#cb20-19" tabindex="-1"></a>  <span class="at">weights =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>)</span>
+<span id="cb20-20"><a href="#cb20-20" tabindex="-1"></a>)</span>
+<span id="cb20-21"><a href="#cb20-21" tabindex="-1"></a><span class="fu">show</span>(results)</span></code></pre></div>
 <pre><code>## Effect Sizes:
 ##         test  beta    se
 ## 1       base  0.01 0.065
@@ -559,13 +619,13 @@ have a skewed or kurtotic (e.g. long-tailed) distribution. It is applied
 by default in the case of continuous phenotype, and is ignored in the
 case of a binary phenotype.</li>
 </ul>
-<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
-<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
-<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
-<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a>  <span class="at">pheno =</span> pheno,</span>
-<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
-<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a>  <span class="at">apply_int =</span> <span class="cn">TRUE</span></span>
-<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>  <span class="at">pheno =</span> pheno,</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a>  <span class="at">apply_int =</span> <span class="cn">TRUE</span></span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a>)</span></code></pre></div>
 <ul>
 <li><code>include_orig_skato_all = TRUE</code> includes standard SKAT-O
 applied to all variants as a component of the omnibus test, while
@@ -576,64 +636,64 @@ the annotation for the PTV class can be specified via
 omnibus test can improve power to detect associations between the
 phenotype and genes that may not be allelic series.</li>
 </ul>
-<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
-<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
-<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
-<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>  <span class="at">pheno =</span> pheno,</span>
-<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
-<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>  <span class="at">include_orig_skato_all =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a>  <span class="at">include_orig_skato_ptv =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a>  <span class="at">ptv_anno =</span> <span class="dv">3</span></span>
-<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a>)</span></code></pre></div>
-<ul>
-<li><code>is_pheno_binary = TRUE</code> is required to indicate that the
-supplied phenotype is binary, and should be analyzed using a logistic
-regression model.</li>
-</ul>
-<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
-<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
-<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
-<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a>  <span class="at">pheno =</span> <span class="dv">1</span> <span class="sc">*</span> (pheno <span class="sc">&gt;</span> <span class="dv">0</span>),</span>
-<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
-<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a>  <span class="at">is_pheno_binary =</span> <span class="cn">TRUE</span></span>
-<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a>)</span></code></pre></div>
-<ul>
-<li><code>min_mac</code> is used to filter the variant set to those
-containing a minimum minor allele count (MAC). The following example
-filters to only those variants with a MAC of at least 2:</li>
-</ul>
-<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
-<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
-<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
-<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>  <span class="at">pheno =</span> pheno,</span>
-<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
-<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a>  <span class="at">min_mac =</span> <span class="dv">2</span></span>
-<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a>)</span></code></pre></div>
-<ul>
-<li><code>return_omni_only = TRUE</code> is used to return
-<code>p_omni</code> only when the component p-values are not of
-interest:</li>
-</ul>
 <div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
 <span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
 <span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
 <span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a>  <span class="at">pheno =</span> pheno,</span>
 <span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
-<span id="cb23-6"><a href="#cb23-6" tabindex="-1"></a>  <span class="at">return_omni_only =</span> <span class="cn">TRUE</span></span>
-<span id="cb23-7"><a href="#cb23-7" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb23-6"><a href="#cb23-6" tabindex="-1"></a>  <span class="at">include_orig_skato_all =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb23-7"><a href="#cb23-7" tabindex="-1"></a>  <span class="at">include_orig_skato_ptv =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb23-8"><a href="#cb23-8" tabindex="-1"></a>  <span class="at">ptv_anno =</span> <span class="dv">3</span></span>
+<span id="cb23-9"><a href="#cb23-9" tabindex="-1"></a>)</span></code></pre></div>
+<ul>
+<li><code>is_pheno_binary = TRUE</code> is required to indicate that the
+supplied phenotype is binary, and should be analyzed using a logistic
+regression model.</li>
+</ul>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a>  <span class="at">pheno =</span> <span class="dv">1</span> <span class="sc">*</span> (pheno <span class="sc">&gt;</span> <span class="dv">0</span>),</span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
+<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a>  <span class="at">is_pheno_binary =</span> <span class="cn">TRUE</span></span>
+<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a>)</span></code></pre></div>
+<ul>
+<li><code>min_mac</code> is used to filter the variant set to those
+containing a minimum minor allele count (MAC). The following example
+filters to only those variants with a MAC of at least 2:</li>
+</ul>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
+<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
+<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a>  <span class="at">pheno =</span> pheno,</span>
+<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
+<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a>  <span class="at">min_mac =</span> <span class="dv">2</span></span>
+<span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a>)</span></code></pre></div>
+<ul>
+<li><code>return_omni_only = TRUE</code> is used to return
+<code>p_omni</code> only when the component p-values are not of
+interest:</li>
+</ul>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
+<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
+<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a>  <span class="at">pheno =</span> pheno,</span>
+<span id="cb26-5"><a href="#cb26-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
+<span id="cb26-6"><a href="#cb26-6" tabindex="-1"></a>  <span class="at">return_omni_only =</span> <span class="cn">TRUE</span></span>
+<span id="cb26-7"><a href="#cb26-7" tabindex="-1"></a>)</span></code></pre></div>
 <ul>
 <li><code>score_test = TRUE</code> specifies the use of a score-type
 allelic series burden test. The default of
 <code>score_test = FALSE</code> specifies a Wald-type allelic series
 burden test.</li>
 </ul>
-<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
-<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
-<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
-<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a>  <span class="at">pheno =</span> pheno,</span>
-<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
-<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a>  <span class="at">score_test =</span> <span class="cn">TRUE</span></span>
-<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
+<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
+<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a>  <span class="at">pheno =</span> pheno,</span>
+<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
+<span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a>  <span class="at">score_test =</span> <span class="cn">TRUE</span></span>
+<span id="cb27-7"><a href="#cb27-7" tabindex="-1"></a>)</span></code></pre></div>
 <ul>
 <li><code>weights</code> specifies the relative phenotypic effects of
 BMVs, DMVs, and PTVs. An increasing pattern such as the default setting
@@ -641,13 +701,13 @@ of <code>weights = c(1, 2, 3)</code> targets allelic series. Setting
 <code>weights = c(1, 1, 1)</code> would target a genetic architecture
 where all variants have equivalent expected magnitudes.</li>
 </ul>
-<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
-<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
-<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
-<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a>  <span class="at">pheno =</span> pheno,</span>
-<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
-<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a>  <span class="at">weights =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>)</span>
-<span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a>AllelicSeries<span class="sc">::</span><span class="fu">COAST</span>(</span>
+<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>  <span class="at">anno =</span> anno,</span>
+<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a>  <span class="at">geno =</span> geno,</span>
+<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a>  <span class="at">pheno =</span> pheno,</span>
+<span id="cb28-5"><a href="#cb28-5" tabindex="-1"></a>  <span class="at">covar =</span> covar,</span>
+<span id="cb28-6"><a href="#cb28-6" tabindex="-1"></a>  <span class="at">weights =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>)</span>
+<span id="cb28-7"><a href="#cb28-7" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 </div>
 

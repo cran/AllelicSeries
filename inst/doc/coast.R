@@ -44,8 +44,39 @@ results@Counts
 ## -----------------------------------------------------------------------------
 results@Pvals
 
+## -----------------------------------------------------------------------------
+set.seed(102)
+
+# Generate data.
+n <- 1e3
+data <- AllelicSeries::DGP(
+  n = n,
+  snps = 10,
+  prop_anno = c(1, 1, 1) / 3
+)
+
+# Collapse ultra-rare variants.
+collapsed <- AllelicSeries::CollapseGeno(
+  anno = data$anno, 
+  geno = data$geno,
+  min_mac = 11
+)
+
+# Variants collapsed to form each aggregate variant.
+head(collapsed$vars)
+
+## ----eval=FALSE---------------------------------------------------------------
+#  # Run COAST on the collapsed data.
+#  results <- AllelicSeries::COAST(
+#    anno = collapsed$anno,
+#    covar = data$covar,
+#    geno = collapsed$geno,
+#    pheno = data$pheno,
+#    min_mac = 10
+#  )
+
 ## ----cache=TRUE---------------------------------------------------------------
-withr::local_seed(102)
+set.seed(102)
 
 # Generate data.
 n <- 1e2

@@ -451,7 +451,6 @@ test_that("Check COAST with different numbers of categories.", {
 
 # ------------------------------------------------------------------------------
 
-# Slow.
 test_that("Test effect size estimation.", {
   
   WrapCOAST <- function(data) {
@@ -500,4 +499,81 @@ test_that("Test effect size estimation.", {
   expect_true(all(lower <= exp & exp <= upper))
   
 })
+
+
+# ------------------------------------------------------------------------------
+
+test_that("Test COAST runs with dosage genotypes.", {
+  
+  withr::local_seed(105) 
+  data <- DGP()
+  geno <- data$geno
+  
+  # Introduce missingness.
+  draw <- sort(sample(length(geno), size = 250, replace = FALSE))
+  geno[draw] <- NA
+  
+  # Expect error if COAST is run with missing genotypes.
+  expect_error(
+    COAST(
+      anno = data$anno,
+      geno = geno,
+      pheno = data$pheno,
+      covar = data$covar
+    )
+  )
+  
+  # Impute.
+  geno <- apply(geno, 2, function(x) {
+    x[is.na(x)] <- mean(x, na.rm = TRUE)
+    return(x)
+  })
+  
+  # Expect no error if missing genotypes are mean-imputed.
+  expect_error(
+    COAST(
+      anno = data$anno,
+      geno = geno,
+      pheno = data$pheno,
+      covar = data$covar
+    ), NA
+  )
+  
+})
+
+
+# ------------------------------------------------------------------------------
+
+test_that("Test intercept is added by default.", {
+
+  withr::local_seed(106)
+  data <- DGP(n = 100)
+  
+  # Results when an intercept is included manually.
+  with_int <- COAST(
+    anno = data$anno,
+    geno = data$geno,
+    covar = data$covar,
+    pheno = data$pheno
+  )
+  
+  # Results without intercept.
+  covar <- data$covar
+  covar <- covar[, 2:6]
+  expect_warning({
+    without_int <- COAST(
+      anno = data$anno,
+      geno = data$geno,
+      covar = covar,
+      pheno = data$pheno
+    )
+  })
+  
+  expect_equal(
+    with_int@Pvals$pval, 
+    without_int@Pvals$pval
+  )
+    
+})
+
 

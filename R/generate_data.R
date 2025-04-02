@@ -82,6 +82,12 @@ GenGeno <- function(
 ) {
   geno <- GenGenoMat(n = n, snps = snps, maf_range = maf_range)
   anno <- GenAnno(snps = snps, prop_anno = prop_anno)
+  
+  # Add variant names.
+  var_names <- paste0("rs", seq_len(snps))
+  colnames(geno) <- var_names
+  names(anno) <- var_names
+  
   out <- list(
     anno = anno,
     geno = geno
@@ -150,7 +156,7 @@ GenCovar <- function(n) {
   out <- cbind(age, pcs)
   out <- scale(out)
   out <- cbind(1, out[, 1], sex, out[, 2:ncol(out)])
-  colnames(out) <- c("int", "age", "sex", paste0("pc", seq_len(N_PC)))
+  colnames(out) <- c("intercept", "age", "sex", paste0("pc", seq_len(N_PC)))
   return(out)
 }
 
@@ -180,7 +186,7 @@ CalcRegParam <- function(
   b_sex <- stats::rnorm(1, sd = sqrt(pve_sex))
   b_pcs <- stats::rnorm(3, sd = sqrt(pve_pcs / 3))
   beta <- c(b_int, b_age, b_sex, b_pcs)
-  names(beta) <- c("int", "age", "sex", "pc1", "pc2", "pc3")
+  names(beta) <- c("intercept", "age", "sex", "pc1", "pc2", "pc3")
 
   # Output.
   out <- list(
@@ -386,6 +392,13 @@ GenPheno <- function(
 #' head(data$covar)
 #' head(data$geno[, 1:5])
 #' hist(data$pheno)
+#' 
+#' # Generate data with L != 3 categories.
+#' data <- DGP(
+#'   beta = c(1, 2, 3, 4),
+#'   prop_anno = c(0.25, 0.25, 0.25, 0.25),
+#'   weights = c(1, 1, 1, 1)
+#' )
 #' @export
 DGP <- function(
   anno = NULL,
